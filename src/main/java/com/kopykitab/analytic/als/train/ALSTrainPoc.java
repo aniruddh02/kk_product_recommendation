@@ -18,13 +18,14 @@ public class ALSTrainPoc {
 
         if (args.length < 4) {
             System.err.println(
-                    "Usage: JavaALS <ratings_file> <rank> <iterations> <output_dir> [<blocks>]");
+                    "Usage: JavaALS <ratings_file> <no_of_recommendations> <iterations> <output_dir> [<blocks>]");
             System.exit(1);
         }
-        SparkConf sparkConf = new SparkConf().setAppName("JavaALS");
+        SparkConf sparkConf = new SparkConf().setAppName("KKRecommendationApp");
 
         //Constants
-        int rank = Integer.parseInt(args[1]);
+        int numberOfRecommendations = Integer.parseInt(args[1]);
+        int rank = 10;
         int iterations = Integer.parseInt(args[2]);
         String outputDir = args[3];
         int blocks = -1;
@@ -39,14 +40,12 @@ public class ALSTrainPoc {
 
         MatrixFactorizationModel model = ALS.train(ratings.rdd(), rank, iterations, 0.01, blocks);
 
-
         //ALS.train(ratings.rdd(), rank, iterations, 0.01, blocks).recommendProductsForUsers(5).toJavaRDD().collect();
-
         /* Can Save the trained model for future use.
         model.save(sparkContext,"");
         */
 
-        model.recommendProductsForUsers(5).toJavaRDD().map(new com.kopykitab.analytic.als.train.ALSTrainPoc.FeaturesToRatingString()).coalesce(1).saveAsTextFile(outputDir + "/recommendation");
+        model.recommendProductsForUsers(numberOfRecommendations).toJavaRDD().map(new com.kopykitab.analytic.als.train.ALSTrainPoc.FeaturesToRatingString()).coalesce(1).saveAsTextFile(outputDir + "/recommendation");
         System.out.println("Final user/product features written to " + outputDir);
         sc.stop();
     }
@@ -64,13 +63,9 @@ public class ALSTrainPoc {
         }
     }
 
-    static class FeaturesToString implements Function<Tuple2<Object, double[]>, String> {
-        @Override
-        public String call(Tuple2<Object, double[]> element) {
-            return element._1() + "," + Arrays.toString(element._2());
-        }
-    }
-
+    /**
+     * Convert Rating into output String.
+     */
     static class FeaturesToRatingString implements Function<Tuple2<Object, Rating[]>, String> {
 
         @Override
@@ -80,10 +75,19 @@ public class ALSTrainPoc {
             String recommendedProducts = "";
 
             for(Rating r : rating){
-               // if(!recommendedProducts.isEmpty())
+                // if(!recommendedProducts.isEmpty())
                 recommendedProducts = recommendedProducts + "," + r.product();
             }
-         return user + "," + recommendedProducts;
+            return user + "," + recommendedProducts;
         }
     }
+
+    static class FeaturesToString implements Function<Tuple2<Object, double[]>, String> {
+        @Override
+        public String call(Tuple2<Object, double[]> element) {
+            return element._1() + "," + Arrays.toString(element._2());
+        }
+    }
+
+
 }
