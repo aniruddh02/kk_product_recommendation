@@ -12,7 +12,6 @@ import java.util.Arrays;
 import java.util.regex.Pattern;
 import scala.Tuple2;
 
-
 public class ALSTrainPoc {
 
     public static void main(String[] args) {
@@ -40,12 +39,15 @@ public class ALSTrainPoc {
 
         MatrixFactorizationModel model = ALS.train(ratings.rdd(), rank, iterations, 0.01, blocks);
 
-        model.userFeatures().toJavaRDD().map(new FeaturesToString()).saveAsTextFile(
-                outputDir + "/userFeatures");
-        model.productFeatures().toJavaRDD().map(new FeaturesToString()).saveAsTextFile(
-                outputDir + "/productFeatures");
-        System.out.println("Final user/product features written to " + outputDir);
 
+        //ALS.train(ratings.rdd(), rank, iterations, 0.01, blocks).recommendProductsForUsers(5).toJavaRDD().collect();
+
+        /* Can Save the trained model for future use.
+        model.save(sparkContext,"");
+        */
+
+        model.recommendProductsForUsers(5).toJavaRDD().map(new com.kopykitab.analytic.als.train.ALSTrainPoc.FeaturesToRatingString()).coalesce(1).saveAsTextFile(outputDir + "/recommendation");
+        System.out.println("Final user/product features written to " + outputDir);
         sc.stop();
     }
     
@@ -69,4 +71,19 @@ public class ALSTrainPoc {
         }
     }
 
+    static class FeaturesToRatingString implements Function<Tuple2<Object, Rating[]>, String> {
+
+        @Override
+        public String call(Tuple2<Object, Rating[]> element) {
+            String user = element._1.toString();
+            Rating[] rating = element._2();
+            String recommendedProducts = "";
+
+            for(Rating r : rating){
+               // if(!recommendedProducts.isEmpty())
+                recommendedProducts = recommendedProducts + "," + r.product();
+            }
+         return user + "," + recommendedProducts;
+        }
+    }
 }
